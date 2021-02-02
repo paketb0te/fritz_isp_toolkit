@@ -15,4 +15,5 @@ class LogEntry:
         self.message = logstring[msg_offset:].strip()
 
     def __str__(self):
-        return str(self.timestamp) + " " + str(self.message)
+        # return the timestamp and local timezone info in ISO 8601 representation
+        return f"{self.timestamp.astimezone().isoformat()} {str(self.message)}"
