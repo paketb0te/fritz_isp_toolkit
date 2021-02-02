@@ -138,8 +138,8 @@ def get_list_from_device(conn: FritzConnection) -> list:
         conn (FritzConnection): Connection object to connect to.
 
     Returns:
-        list: List of LogEntry objects created from the devices'
-        logfile, sorted by timestamp.
+        log_entries (list): List of LogEntry objects created
+        from the devices' logfile, sorted by timestamp.
     """
 
     log_dict = conn.call_action("DeviceInfo1", "GetDeviceLog")
@@ -160,14 +160,14 @@ def get_list_of_new_entries(device_entries: list, file_entries: list) -> list:
     Compares log entries from the local logfile with the log entries from the device
 
     Args:
-        device_entries: List of LogEntry Objects, fetched from the device
-        file_entries: List of LogEntry Objects, fetched from the local logfile
+        device_entries (list): List of LogEntry Objects, fetched from the device
+        file_entries (list): List of LogEntry Objects, fetched from the local logfile
 
     Raises:
         N/A
 
     Returns:
-        new_entries: List of LogEntry objects from the device
+        new_entries (list): List of LogEntry objects from the device
         which are not yet present in the local logfile
 
     """
@@ -194,7 +194,7 @@ def create_log_dir(log_dir="logs"):
     Create log directory to store outputs.
 
     Args:
-        log_dir: The name of the directory to be created.
+        log_dir (str): The name of the directory to be created.
             Default: "logs:
 
     Raises:
@@ -215,16 +215,17 @@ def process_isp_logs(isp_address: str, isp_uname: str, isp_pword: str) -> list:
     script.
 
     Args:
-        N/A
+        isp_address (str): hostname / IP Address of the target FritzBox device
+        isp_uname (str): Username to log in to the device
+        isp_pword (str): Password to log in to the device
 
     Raises:
         N/A
 
     Returns:
-        log_file: The log_file containing the Fritz ISP router
-        logs, ready for further processing.
-        timestamp: A string formatted timestamp for usage for the
-        notification component of the main workflow.
+        new_entries (list): List of LogEntry objects from the device
+        which are not yet present in the local logfile.
+        Can be used for further processing with a notifier.
 
     """
     # Create a logs directory to save the results into.
