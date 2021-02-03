@@ -7,29 +7,16 @@ via Gmail.
 You can use something else to send the Gmail notification.
 """
 # Import modules
-import base64
-import datetime as dt
-from logging import log
-import mimetypes
+
 import os
 import os.path
 import pathlib as pl
-import pickle  # nosec
 import sys
-from email import encoders
-from email.mime.base import MIMEBase
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from os import environ
-from apiclient import errors
+from notifiers import StdoutNotifier, GmailNotifier
+from classes import LogEntry, Notifier
 from dotenv import load_dotenv
 from fritzconnection import FritzConnection
-from google.auth.transport.requests import Request
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-
-import notifiers
-from classes import LogEntry
 
 
 print("Commencing ISP Toolkit ...")
@@ -39,41 +26,37 @@ dirname = os.path.dirname(os.path.abspath(__file__))
 # files and templates
 sys.path.append(os.path.join(dirname))
 
-# Setup credential_dir
-CRED_DIR = pl.Path.cwd().joinpath(dirname, "..", "creds")
 
-"""
-Block of code to process the ingestion of environmental
-variables
-"""
-# Get path to where environmental variables are stored and
-env_path = pl.Path.cwd().joinpath(CRED_DIR, ".env")
-# NOTE: This has been set to always revert to system provided environmental
-# variables, rather than what is provided in the .env file using
-# the override=False method.
-# If nothing is set on the system, the values from the .env file are used.
-load_dotenv(dotenv_path=env_path, override=False)
+def verify_env() -> None:
+    """
+    Block of code to process the ingestion of environmental
+    variables
+    """
+    # Setup credential_dir
+    cred_dir = pl.Path.cwd().joinpath(dirname, "..", "creds")
+    # Get path to where environmental variables are stored and
+    env_path = pl.Path.cwd().joinpath(cred_dir, ".env")
+    # NOTE: This has been set to always revert to system provided environmental
+    # variables, rather than what is provided in the .env file using
+    # the override=False method.
+    # If nothing is set on the system, the values from the .env file are used.
+    load_dotenv(dotenv_path=env_path, override=False)
 
-# Specify a list of environmental variables
-# for usage inside script
-environment_variables = [
-    "ISP_RTR_UNAME",
-    "ISP_RTR_PWORD",
-    "ISP_RTR_ADDRESS",
-]
-# Iterate over environmental variables and ensure they are set,
-# if not exit the program.
-for variables in environment_variables:
-    if environ.get(variables) is not None:
-        print(f"Environmental variable: {variables} is set.")
-    else:
-        print(f"Environmental variable: {variables} is NOT set, exiting script.")
-        sys.exit(1)
-
-# Assign environmental variables to variables for usage.
-isp_uname = environ.get("ISP_RTR_UNAME")
-isp_pword = environ.get("ISP_RTR_PWORD")
-isp_address = environ.get("ISP_RTR_ADDRESS")
+    # Specify a list of environmental variables
+    # for usage inside script
+    environment_variables = [
+        "ISP_RTR_UNAME",
+        "ISP_RTR_PWORD",
+        "ISP_RTR_ADDRESS",
+    ]
+    # Iterate over environmental variables and ensure they are set,
+    # if not exit the program.
+    for variables in environment_variables:
+        if environ.get(variables) is not None:
+            print(f"Environmental variable: {variables} is set.")
+        else:
+            print(f"Environmental variable: {variables} is NOT set, exiting script.")
+            sys.exit(1)
 
 
 def load_list_from_logfile(filepath: str) -> list:
@@ -233,10 +216,10 @@ def process_isp_logs(isp_address: str, isp_uname: str, isp_pword: str) -> list:
     output_dir = create_log_dir(log_dir=log_dir)
     log_file = f"{output_dir}/{isp_address}.log"
     # Initialise connection to Fritz ISP Router
-    fc = FritzConnection(address=isp_address, user=isp_uname, password=isp_pword)
+    conn = FritzConnection(address=isp_address, user=isp_uname, password=isp_pword)
     # Read log entries from the local logfile
     file_entries = load_list_from_logfile(filepath=log_file)
-    device_entries = get_list_from_device(conn=fc)
+    device_entries = get_list_from_device(conn=conn)
     # get the log entries which are present on the device
     # but not yet written to the local logfile
     new_entries = get_list_of_new_entries(
@@ -262,6 +245,7 @@ def main(stdout=True, gmail=False) -> None:
         stdout: Boolean to toggle notification to stdout on/off
         gmail: Boolean to toggle gmail notification on/off
     """
+    verify_env()
     # Assign environmental variables to variables for usage.
     isp_uname = environ.get("ISP_RTR_UNAME")
     isp_pword = environ.get("ISP_RTR_PWORD")
@@ -270,8 +254,18 @@ def main(stdout=True, gmail=False) -> None:
     new_entries = process_isp_logs(
         isp_address=isp_address, isp_uname=isp_uname, isp_pword=isp_pword
     )
+
+    notifier = Notifier(isp_address=isp_address, new_entries=new_entries)
     if stdout:
-        notifiers.print_to_stdout(isp_address=isp_address, new_entries=new_entries)
+        notifier = StdoutNotifier(isp_address=isp_address, new_entries=new_entries)
+    if gmail:
+        notifier = GmailNotifier(
+            isp_address=isp_address,
+            new_entries=new_entries,
+            cred_dir=pl.Path.cwd().joinpath(dirname, "..", "creds"),
+        )
+
+    notifier.notify()
 
 
 if __name__ == "__main__":
