@@ -1,6 +1,7 @@
 """
 Module containing classes for use in the friitz_isp_toolit
 """
+
 import dateparser
 
 

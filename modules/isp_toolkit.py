@@ -9,15 +9,12 @@ You can use something else to send the Gmail notification.
 # Import modules
 
 import os
-import os.path
 import pathlib as pl
 import sys
-from os import environ
-from notifiers import StdoutNotifier, GmailNotifier
-from classes import LogEntry, Notifier
-from dotenv import load_dotenv
-from fritzconnection import FritzConnection
-
+import notifiers
+import classes
+import dotenv
+import fritzconnection
 
 print("Commencing ISP Toolkit ...")
 # Get path of the current dir under which the file is executed
@@ -40,7 +37,7 @@ def verify_env() -> None:
     # variables, rather than what is provided in the .env file using
     # the override=False method.
     # If nothing is set on the system, the values from the .env file are used.
-    load_dotenv(dotenv_path=env_path, override=False)
+    dotenv.load_dotenv(dotenv_path=env_path, override=False)
 
     # Specify a list of environmental variables
     # for usage inside script
@@ -52,7 +49,7 @@ def verify_env() -> None:
     # Iterate over environmental variables and ensure they are set,
     # if not exit the program.
     for variables in environment_variables:
-        if environ.get(variables) is not None:
+        if os.environ.get(variables) is not None:
             print(f"Environmental variable: {variables} is set.")
         else:
             print(f"Environmental variable: {variables} is NOT set, exiting script.")
@@ -82,7 +79,7 @@ def load_list_from_logfile(filepath: str) -> list:
     log_entries = []
 
     for line in log_lines:
-        log_entries.append(LogEntry(logstring=line, msg_offset=20))
+        log_entries.append(classes.LogEntry(logstring=line, msg_offset=20))
 
     log_entries.sort(key=lambda entry: entry.timestamp)
 
@@ -112,13 +109,13 @@ def append_list_to_logfile(log_entries: list, filepath: str) -> None:
             file.write(str(entry) + "\n")
 
 
-def get_list_from_device(conn: FritzConnection) -> list:
+def get_list_from_device(conn: fritzconnection.FritzConnection) -> list:
     """
     Fetches the logfile from the connected device
     and turns it into a list of LogEntry objects.
 
     Args:
-        conn (FritzConnection): Connection object to connect to.
+        conn (fritzconnection.FritzConnection): Connection object to connect to.
 
     Returns:
         log_entries (list): List of LogEntry objects created
@@ -131,7 +128,7 @@ def get_list_from_device(conn: FritzConnection) -> list:
     log_entries = []
 
     for line in log_lines:
-        log_entries.append(LogEntry(logstring=line, msg_offset=18))
+        log_entries.append(classes.LogEntry(logstring=line, msg_offset=18))
 
     log_entries.sort(key=lambda entry: entry.timestamp)
 
@@ -216,7 +213,9 @@ def process_isp_logs(isp_address: str, isp_uname: str, isp_pword: str) -> list:
     output_dir = create_log_dir(log_dir=log_dir)
     log_file = f"{output_dir}/{isp_address}.log"
     # Initialise connection to Fritz ISP Router
-    conn = FritzConnection(address=isp_address, user=isp_uname, password=isp_pword)
+    conn = fritzconnection.FritzConnection(
+        address=isp_address, user=isp_uname, password=isp_pword
+    )
     # Read log entries from the local logfile
     file_entries = load_list_from_logfile(filepath=log_file)
     device_entries = get_list_from_device(conn=conn)
@@ -247,19 +246,21 @@ def main(stdout=True, gmail=False) -> None:
     """
     verify_env()
     # Assign environmental variables to variables for usage.
-    isp_uname = environ.get("ISP_RTR_UNAME")
-    isp_pword = environ.get("ISP_RTR_PWORD")
-    isp_address = environ.get("ISP_RTR_ADDRESS")
+    isp_uname = os.environ.get("ISP_RTR_UNAME")
+    isp_pword = os.environ.get("ISP_RTR_PWORD")
+    isp_address = os.environ.get("ISP_RTR_ADDRESS")
     # Connect to Fritz ISP Router and process the logs
     new_entries = process_isp_logs(
         isp_address=isp_address, isp_uname=isp_uname, isp_pword=isp_pword
     )
 
-    notifier = Notifier(isp_address=isp_address, new_entries=new_entries)
+    notifier = classes.Notifier(isp_address=isp_address, new_entries=new_entries)
     if stdout:
-        notifier = StdoutNotifier(isp_address=isp_address, new_entries=new_entries)
+        notifier = notifiers.StdoutNotifier(
+            isp_address=isp_address, new_entries=new_entries
+        )
     if gmail:
-        notifier = GmailNotifier(
+        notifier = notifiers.GmailNotifier(
             isp_address=isp_address,
             new_entries=new_entries,
             cred_dir=pl.Path.cwd().joinpath(dirname, "..", "creds"),

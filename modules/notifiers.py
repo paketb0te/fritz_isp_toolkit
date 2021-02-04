@@ -6,22 +6,24 @@ Module containing notifiers for the fritz_isp_toolkit
 import base64
 import os.path
 import pickle  # nosec
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from datetime import datetime
-from apiclient import errors
+import datetime
+from email.mime import multipart, text
+import apiclient
+import classes
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from classes import Notifier
 
 
-class StdoutNotifier(Notifier):  # pylint: disable=too-few-public-methods
+class StdoutNotifier(classes.Notifier):  # pylint: disable=too-few-public-methods
     """
     Notifier printing new LogEntry objects to stdout.
     """
 
     def notify(self) -> None:
+        """
+        Print new LogEntry objects to stdout
+        """
         if self.new_entries:
             print("-" * 80)
             print(f"{len(self.new_entries)} new log entries on {self.isp_address}:\n")
@@ -34,7 +36,7 @@ class StdoutNotifier(Notifier):  # pylint: disable=too-few-public-methods
             print("-" * 80)
 
 
-class GmailNotifier(Notifier):
+class GmailNotifier(classes.Notifier):
     """
     Notifier sending mail via gmail API
     """
@@ -117,10 +119,10 @@ class GmailNotifier(Notifier):
             message_text.append(new_entry)
 
         # Create an email message
-        mime_message = MIMEMultipart()
+        mime_message = multipart.MIMEMultipart()
         mime_message["to"] = recipient
         mime_message["subject"] = subject
-        mime_message.attach(MIMEText(message_text, "plain"))
+        mime_message.attach(text.MIMEText(message_text, "plain"))
 
         # Format message dictionary, ready for sending
         message = {"raw": base64.urlsafe_b64encode(mime_message.as_bytes()).decode()}
@@ -147,19 +149,19 @@ class GmailNotifier(Notifier):
             message_id = message["id"]
             print(f"Message Sent - Message ID: {message_id}")
             return message
-        except errors.HttpError as err:
+        except apiclient.errors.HttpError as err:
             print(f"An error occurred: {err}")
 
     def notify(self) -> None:
         """
-        Notifier sending new LogEntry objects via gmail API
+        Send new LogEntry objects via gmail API
         """
         # Authorise to the gmail service
         service = self.authorise_gmail_service()
         # Create email with attachment function
         message = self.create_message(
             recipient="danielfjteycheney@gmail.com",
-            subject=f"ISP Log File Report - {datetime.now()}",
+            subject=f"ISP Log File Report - {datetime.datetime.now()}",
             new_entries=self.new_entries,
         )
         # Send the email
